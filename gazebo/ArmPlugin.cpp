@@ -580,7 +580,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
 				avgGoalDelta  = (avgGoalDelta * ALPHA) + (distDelta * (1.0f - ALPHA));
 
 				// linear reward function
-				rewardHistory = avgGoalDelta > 0 ? INTERIMREWARD * avgGoalDelta : REWARD_LOSS * distGoal;
+				rewardHistory = INTERIM_REWARD * avgGoalDelta - INTERIM_OFFSET;
 
 				newReward = true;
 			}
