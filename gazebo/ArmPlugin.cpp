@@ -11,7 +11,7 @@
 #include "cudaPlanar.h"
 
 /*TASK = 1 or 2*/
-#define TASK 1
+#define TASK 2
 #define PI 3.141592653589793238462643383279502884197169f
 
 #define JOINT_MIN	-0.75f
@@ -44,9 +44,7 @@
     #define REPLAY_MEMORY 10000
     #define BATCH_SIZE 32
     #define USE_LSTM true
-    #define LSTM_SIZE 128
-    #define REWARD_WIN  0.10f
-    #define REWARD_LOSS -0.10f //Task_1
+    #define LSTM_SIZE 128 //Task_1
 
 #elif TASK == 2
     #define INPUT_WIDTH   64
@@ -54,14 +52,9 @@
     #define OPTIMIZER "Adam"
     #define LEARNING_RATE 0.1f
     #define REPLAY_MEMORY 10000
-    #define BATCH_SIZE 256
+    #define BATCH_SIZE 128
     #define USE_LSTM true
-    #define LSTM_SIZE 256
-    #define REWARD_WIN  20.0f
-    #define REWARD_LOSS -20.0f
-    #define INTERIM_REWARD 4.0f
-    #define INTERIM_OFFSET 0.3f
-    #define ALPHA 0.4f//Task_2
+    #define LSTM_SIZE 256 //Task_2
 #endif
 
 #define NUM_ACCTIONS 6
@@ -72,7 +65,8 @@
 /
 */
 
-
+#define REWARD_WIN  0.10f
+#define REWARD_LOSS -0.10f
 
 // Define Object Names
 #define WORLD_NAME "arm_world"
@@ -308,7 +302,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 #if TASK == 1
                 if (collisionCheck)
                 {
-                rewardHistory = REWARD_WIN;
+                rewardHistory = REWARD_WIN * 25.0f;
                         newReward  = true;
                         endEpisode = true;
                         return;
@@ -317,12 +311,21 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
         if (collisionCheck)
         {
             if (collisionCheck_G){
-                rewardHistory = collisionWithRobot ? REWARD_WIN : REWARD_LOSS;
-
+                rewardHistory = (100 - episodeFrames) * REWARD_WIN;
                 newReward  = true;
                 endEpisode = true;
                 return;
-            }
+            }//Finally not used
+//             else if (collisionCheck_A) {
+//                rewardHistory = REWARD_LOSS ;
+//                newReward  = true;
+//                endEpisode = true;
+//             }
+            //else{
+            //    rewardHistory = REWARD_LOSS * 10.0f;
+            //    newReward  = true;
+            //    endEpisode = true;
+            //}
         }
 
 #endif
@@ -369,60 +372,66 @@ bool ArmPlugin::updateAgent()
 
 
         /*
-        	/ TODO - Increase or decrease the joint velocity based on whether the action is even or odd
-        	/
-        	*/
+        / TODO - Increase or decrease the joint velocity based on whether the action is even or odd
+        /
+        */
 
-                // TODO - Set joint velocity based on whether action is even or odd.
+        float velocity = 0.0; // TODO - Set joint velocity based on whether action is even or odd.
+        if (action % 2 == 0){
+        velocity = vel[action/2] + actionVelDelta;
+    }
+        else{
+        velocity = vel[action/2] - actionVelDelta;
+    }
+        if( velocity < VELOCITY_MIN )
+                velocity = VELOCITY_MIN;
 
-        	float velocity = vel[action/2] + (1 - 2 * (action % 2)) * actionVelDelta;
+        if( velocity > VELOCITY_MAX )
+                velocity = VELOCITY_MAX;
 
-        	if( velocity < VELOCITY_MIN )
-        		velocity = VELOCITY_MIN;
+        vel[action/2] = velocity;
 
-        	if( velocity > VELOCITY_MAX )
-        		velocity = VELOCITY_MAX;
+        for( uint32_t n=0; n < DOF; n++ )
+        {
+                ref[n] += vel[n];
 
-        	vel[action/2] = velocity;
-
-        	for( uint32_t n=0; n < DOF; n++ )
-        	{
-        		ref[n] += vel[n];
-
-        		if( ref[n] < JOINT_MIN )
-        		{
-        			ref[n] = JOINT_MIN;
-        			vel[n] = 0.0f;
-        		}
-        		else if( ref[n] > JOINT_MAX )
-        		{
-        			ref[n] = JOINT_MAX;
-        			vel[n] = 0.0f;
-        		}
-        	}
-        #else
-
-        	/*
-        	/ TODO - Increase or decrease the joint position based on whether the action is even or odd
-        	/
-        	*/
-
-                // TODO - Set joint position based on whether action is even or odd.
-        	float joint = ref[action/2] + (1 - 2 * (action % 2)) * actionJointDelta;
-
-        	// limit the joint to the specified range
-        	if( joint < JOINT_MIN )
-        		joint = JOINT_MIN;
-
-        	if( joint > JOINT_MAX )
-        		joint = JOINT_MAX;
-
-        	ref[action/2] = joint;
-
-        #endif
-
-        	return true;
+                if( ref[n] < JOINT_MIN )
+                {
+                        ref[n] = JOINT_MIN;
+                        vel[n] = 0.0f;
+                }
+                else if( ref[n] > JOINT_MAX )
+                {
+                        ref[n] = JOINT_MAX;
+                        vel[n] = 0.0f;
+                }
         }
+#else
+
+        /*
+        / TODO - Increase or decrease the joint position based on whether the action is even or odd
+        /
+        */
+        float joint = 0.0; // TODO - Set joint position based on whether action is even or odd.
+        if (action % 2 == 0){
+        joint = ref[action/2] + actionJointDelta;
+    }
+        else{
+        joint = ref[action/2] - actionJointDelta;
+    }
+        // limit the joint to the specified range
+        if( joint < JOINT_MIN )
+                joint = JOINT_MIN;
+
+        if( joint > JOINT_MAX )
+                joint = JOINT_MAX;
+
+        ref[action/2] = joint;
+
+#endif
+
+        return true;
+}
 
 
 // update joint reference positions, returns true if positions have been modified
@@ -640,10 +649,9 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
                     /* Here the aim is to reduce the penalty while the arm is getting closer to the target
                     */
 //                    rewardHistory = REWARD_LOSS * 10 * (gripBBox.min.x - propBBox.min.x); (not work)
-
-                          rewardHistory = REWARD_LOSS;
-                          newReward     = true;
-                          endEpisode = true;
+                    rewardHistory = REWARD_LOSS * 10;
+                    newReward     = true;
+                    endEpisode    = true;
                 }
 
                 /*
@@ -652,25 +660,47 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
                 */
 
                 if(!checkGroundContact)
-                if(!checkGroundContact)
-		{
-			const float distGoal = BoxDistance(gripBBox, propBBox); // compute the reward from distance to the goal
+                {
+                    const float distGoal = BoxDistance(propBBox,gripBBox); // compute the reward from distance to the goal
 
-			if(DEBUG){printf("distance('%s', '%s') = %f\n", gripper->GetName().c_str(), prop->model->GetName().c_str(), distGoal);}
+//                    if(true){printf("distance('%s', '%s') = %f\n", gripper->GetName().c_str(), prop->model->GetName().c_str(), distGoal);}
 
 
-			if( episodeFrames > 1 )
-			{
-				const float distDelta  = lastGoalDistance - distGoal;
+                    if( episodeFrames > 1 )
+                    {
+                        const double distDelta  = lastGoalDistance - distGoal;
+                        //if is positive the arm is getting close
+                        const double alpha = 0.7;
 
-				// compute the smoothed moving average of the delta of the distance to the goal
-				avgGoalDelta  = (avgGoalDelta * ALPHA) + (distDelta * (1.0f - ALPHA));
-				rewardHistory = INTERIM_REWARD * avgGoalDelta - INTERIM_OFFSET;
-				newReward     = true;
-			}
+                        // compute the smoothed moving average of the delta of the distance to the goal
+                        double average_delta  = (average_delta * alpha) + (distDelta * (1.0 - alpha));
+                        avgGoalDelta  = average_delta;
 
-			lastGoalDistance = distGoal;
-} 
+                        if (avgGoalDelta > 0.001f){
+                            // positive reward when it is getting closer
+                            if (distGoal > 0.0){
+
+//                             rewardHistory = REWARD_WIN / (1.0 + (distGoal + (gripBBox.min.x - propBBox.min.x)));
+//                             rewardHistory = REWARD_WIN * 10.0f * (1.5f - sigmoid(10 * avgGoalDelta));
+
+                             rewardHistory = REWARD_WIN;
+                            }else if (distGoal < 0.001 || distGoal == 0.0){
+                                // get a bonus when it is very close
+                                rewardHistory = REWARD_WIN * 20 ;
+                            }
+                        }
+                        else if (avgGoalDelta < 0.0f){
+                            // more punishment the further away from the object
+                            rewardHistory = REWARD_LOSS * distGoal;
+                        }else{
+                            // accumulative punish if it is not moving
+                            rewardHistory += REWARD_LOSS;
+                        }
+
+                        newReward = true;
+                    }
+                    lastGoalDistance = distGoal;
+                }
         }
 
         // issue rewards and train DQN
