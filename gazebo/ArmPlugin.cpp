@@ -44,7 +44,7 @@
     #define REPLAY_MEMORY 10000
     #define BATCH_SIZE 32
     #define USE_LSTM true
-    #define LSTM_SIZE 128 //Task_1
+    #define LSTM_SIZE 128
 
 #elif TASK == 2
     #define INPUT_WIDTH   64
@@ -54,7 +54,7 @@
     #define REPLAY_MEMORY 10000
     #define BATCH_SIZE 128
     #define USE_LSTM true
-    #define LSTM_SIZE 256 //Task_2
+    #define LSTM_SIZE 256
 #endif
 
 #define NUM_ACCTIONS 6
@@ -135,7 +135,7 @@ ArmPlugin::ArmPlugin() : ModelPlugin(), cameraNode(new gazebo::transport::Node()
         inputBufferSize  = 0;
         inputRawWidth    = 0;
         inputRawHeight   = 0;
-        actionJointDelta = 0.12f; //a litle reduce of 0.03
+        actionJointDelta = 0.12f; // reduced to encourage smooth arm operation
         actionVelDelta   = 0.1f;
         maxEpisodeLength = 100;
         episodeFrames    = 0;
@@ -166,7 +166,7 @@ void ArmPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr /*_sdf*/)
         // Create our node for camera communication
         cameraNode->Init();
 
-        // TODO - Subscribe to camera topic
+        // Subscribe to camera topic
 
         cameraSub =  cameraNode->Subscribe("/gazebo/arm_world/camera/link/camera/image", &ArmPlugin::onCameraMsg , this);
 
@@ -174,7 +174,7 @@ void ArmPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr /*_sdf*/)
         collisionNode->Init();
 
         /*
-        / TODO - Subscribe to prop collision topic
+        / Subscribe to prop collision topic
         */
         collisionSub = collisionNode->Subscribe("/gazebo/arm_world/tube/tube_link/my_contact", &ArmPlugin::onCollisionMsg , this);
 
@@ -291,13 +291,12 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
 
 
                 /*
-                / TODO - Check if there is collision between the arm and object, then issue learning reward
+                / Check if there is collision between the arm and object, then issue learning reward
                 /
                 */
 
         bool collisionCheck = (strcmp(contacts->contact(i).collision1().c_str(), COLLISION_ITEM) == 0) ? true : false;
         bool collisionCheck_G = (strcmp(contacts->contact(i).collision2().c_str(), COLLISION_POINT) == 0) ? true : false;
-//        bool collisionCheck_A = (strcmp(contacts->contact(i).collision2().c_str(), COLLISION_ARM) == 0) ? true : false;
 
 #if TASK == 1
                 if (collisionCheck)
@@ -315,17 +314,7 @@ void ArmPlugin::onCollisionMsg(ConstContactsPtr &contacts)
                 newReward  = true;
                 endEpisode = true;
                 return;
-            }//Finally not used
-//             else if (collisionCheck_A) {
-//                rewardHistory = REWARD_LOSS ;
-//                newReward  = true;
-//                endEpisode = true;
-//             }
-            //else{
-            //    rewardHistory = REWARD_LOSS * 10.0f;
-            //    newReward  = true;
-            //    endEpisode = true;
-            //}
+            }
         }
 
 #endif
@@ -372,11 +361,11 @@ bool ArmPlugin::updateAgent()
 
 
         /*
-        / TODO - Increase or decrease the joint velocity based on whether the action is even or odd
+        / Increase or decrease the joint velocity based on whether the action is even or odd
         /
         */
 
-        float velocity = 0.0; // TODO - Set joint velocity based on whether action is even or odd.
+        float velocity = 0.0;
         if (action % 2 == 0){
         velocity = vel[action/2] + actionVelDelta;
     }
@@ -409,10 +398,10 @@ bool ArmPlugin::updateAgent()
 #else
 
         /*
-        / TODO - Increase or decrease the joint position based on whether the action is even or odd
+        / Increase or decrease the joint position based on whether the action is even or odd
         /
         */
-        float joint = 0.0; // TODO - Set joint position based on whether action is even or odd.
+        float joint = 0.0;
         if (action % 2 == 0){
         joint = ref[action/2] + actionJointDelta;
     }
@@ -442,28 +431,7 @@ bool ArmPlugin::updateJoints()
                 const float step = (JOINT_MAX - JOINT_MIN) * (float(1.0f) / float(ANIMATION_STEPS));
 
 #if 0
-                // range of motion
-                if( animationStep < ANIMATION_STEPS )
-                {
-                        animationStep++;
-                        printf("animation step %u\n", animationStep);
 
-                        for( uint32_t n=0; n < DOF; n++ )
-                                ref[n] = JOINT_MIN + step * float(animationStep);
-                }
-                else if( animationStep < ANIMATION_STEPS * 2 )
-                {
-                        animationStep++;
-                        printf("animation step %u\n", animationStep);
-
-                        for( uint32_t n=0; n < DOF; n++ )
-                                ref[n] = JOINT_MAX - step * float(animationStep-ANIMATION_STEPS);
-                }
-                else
-                {
-                        animationStep = 0;
-
-                }
 
 #else
                 // return to base position
@@ -655,15 +623,13 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
                 }
 
                 /*
-                / TODO - Issue an interim reward based on the distance to the object
+                / Issue an interim reward based on the distance to the object
                 /
                 */
 
                 if(!checkGroundContact)
                 {
                     const float distGoal = BoxDistance(propBBox,gripBBox); // compute the reward from distance to the goal
-
-//                    if(true){printf("distance('%s', '%s') = %f\n", gripper->GetName().c_str(), prop->model->GetName().c_str(), distGoal);}
 
 
                     if( episodeFrames > 1 )
@@ -679,9 +645,6 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
                         if (avgGoalDelta > 0.001f){
                             // positive reward when it is getting closer
                             if (distGoal > 0.0){
-
-//                             rewardHistory = REWARD_WIN / (1.0 + (distGoal + (gripBBox.min.x - propBBox.min.x)));
-//                             rewardHistory = REWARD_WIN * 10.0f * (1.5f - sigmoid(10 * avgGoalDelta));
 
                              rewardHistory = REWARD_WIN;
                             }else if (distGoal < 0.001 || distGoal == 0.0){
