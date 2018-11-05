@@ -33,7 +33,7 @@
 #define EPS_DECAY 150
 
 /*
-/ TODO - Tune the following hyperparameters
+/ Tune the following hyperparameters
 /
 */
 #if TASK == 1
