@@ -601,7 +601,7 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
                 const float groundContact = 0.01f;
 
                 /*
-                / TODO - set appropriate Reward for robot hitting the ground.
+                / set appropriate Reward for robot hitting the ground.
                 /
                 */
                 bool checkGroundContact = (gripBBox.min.z <= groundContact) ? true : false;
