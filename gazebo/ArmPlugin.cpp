@@ -61,7 +61,7 @@
 
 // #define
 /*
-/ TODO - Define Reward Parameters
+/ Define Reward Parameters
 /
 */
 
@@ -356,9 +356,6 @@ bool ArmPlugin::updateAgent()
 
 
 #if VELOCITY_CONTROL
-        // if the action is even, increase the joint position by the delta parameter
-        // if the action is odd,  decrease the joint position by the delta parameter
-
 
         /*
         / Increase or decrease the joint velocity based on whether the action is even or odd
@@ -485,7 +482,6 @@ bool ArmPlugin::updateJoints()
 
         return false;
 }
-
 
 // get the servo center for a particular degree of freedom
 float ArmPlugin::resetPosition( uint32_t dof )
@@ -614,9 +610,8 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
                 if(checkGroundContact)
                 {
                     if(true){printf("GROUND CONTACT, EOE\n");}
-                    /* Here the aim is to reduce the penalty while the arm is getting closer to the target
-                    */
-//                    rewardHistory = REWARD_LOSS * 10 * (gripBBox.min.x - propBBox.min.x); (not work)
+                    // Here the aim is to reduce the penalty while the arm is getting closer to the target
+
                     rewardHistory = REWARD_LOSS * 10;
                     newReward     = true;
                     endEpisode    = true;
@@ -635,28 +630,28 @@ void ArmPlugin::OnUpdate(const common::UpdateInfo& updateInfo)
                     if( episodeFrames > 1 )
                     {
                         const double distDelta  = lastGoalDistance - distGoal;
-                        //if is positive the arm is getting close
+                        //+ive if arm is getting close
                         const double alpha = 0.7;
 
-                        // compute the smoothed moving average of the delta of the distance to the goal
+                        // smooth moving average
                         double average_delta  = (average_delta * alpha) + (distDelta * (1.0 - alpha));
                         avgGoalDelta  = average_delta;
 
                         if (avgGoalDelta > 0.001f){
-                            // positive reward when it is getting closer
+                            // +ive reward for getting closer
                             if (distGoal > 0.0){
 
                              rewardHistory = REWARD_WIN;
                             }else if (distGoal < 0.001 || distGoal == 0.0){
-                                // get a bonus when it is very close
+                                // bonus when very close
                                 rewardHistory = REWARD_WIN * 20 ;
                             }
                         }
                         else if (avgGoalDelta < 0.0f){
-                            // more punishment the further away from the object
+                            // -ive reward for further away
                             rewardHistory = REWARD_LOSS * distGoal;
                         }else{
-                            // accumulative punish if it is not moving
+                            // cumulative punishment for no movement
                             rewardHistory += REWARD_LOSS;
                         }
 
