@@ -10,7 +10,7 @@
 #include "cudaMappedMemory.h"
 #include "cudaPlanar.h"
 
-/*TASK = 1 or 2*/
+
 #define TASK 2
 #define PI 3.141592653589793238462643383279502884197169f
 
